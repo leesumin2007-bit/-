@@ -484,3 +484,16 @@
   </script>
 </body>
 </html>
+.result {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .6);
+  border-radius: 10px;
+}
+
+.result[hidden] {
+  display: none !important;
+}
