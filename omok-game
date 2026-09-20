@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>15x15 오목 게임</title>
   <style>
-    :root { --ink:#172033; --muted:#60708a; --accent:#2563eb; --wood:#d9a15b; --wood-dark:#a96f2e; }
+    :root { --ink:#172033; --muted:#60708a; --accent:#2563eb; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; color:var(--ink); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:linear-gradient(135deg,#eaf3ff,#fff7e8); }
     .app { width:min(1100px,94vw); margin:0 auto; padding:28px 0 44px; }
@@ -16,7 +16,7 @@
     .panel, .board-card { background:rgba(255,255,255,.88); border:1px solid rgba(255,255,255,.8); border-radius:22px; box-shadow:0 16px 40px rgba(50,72,110,.14); }
     .board-card { padding:clamp(10px,2vw,22px); }
     .board-wrap { width:min(78vw,680px); max-width:100%; margin:auto; aspect-ratio:1; display:grid; place-items:center; border-radius:12px; padding:clamp(9px,2vw,18px); background:linear-gradient(135deg,#e4ad66,#c9893d); box-shadow:inset 0 0 0 2px rgba(115,65,18,.25),inset 0 5px 12px rgba(255,255,255,.25),0 8px 20px rgba(86,52,19,.2); }
-    .board { width:100%; height:100%; position:relative; display:grid; grid-template-columns:repeat(15,1fr); grid-template-rows:repeat(15,1fr); background:#e2aa62; background-image:linear-gradient(10deg,rgba(120,74,26,.05) 1px,transparent 1px); border:1px solid #85521f; }
+    .board { width:100%; height:100%; position:relative; display:grid; grid-template-columns:repeat(15,1fr); grid-template-rows:repeat(15,1fr); background:#e2aa62; border:1px solid #85521f; }
     .cell { position:relative; border:0; padding:0; background:transparent; cursor:pointer; }
     .cell::before { content:""; position:absolute; left:0; right:0; top:50%; height:1px; background:#75481f; transform:translateY(-50%); }
     .cell::after { content:""; position:absolute; top:0; bottom:0; left:50%; width:1px; background:#75481f; transform:translateX(-50%); }
@@ -77,55 +77,85 @@
     const starPoints = new Set(['3,3','3,11','7,7','11,3','11,11']);
     const directions = [[1,0],[0,1],[1,1],[1,-1]];
 
+    function buildBoardGrid() {
+      const grid = document.createElement('div');
+      grid.className = 'board';
+      boardEl.innerHTML = '';
+      boardEl.appendChild(grid);
+      return grid;
+    }
+
     function startGame() {
       board = Array.from({length:SIZE}, () => Array(SIZE).fill(0));
       gameOver = false; thinking = false; lastMove = null;
-      boardEl.innerHTML = '';
+      const boardGrid = buildBoardGrid();
       cells = [];
       for (let r=0;r<SIZE;r++) {
         cells[r] = [];
         for (let c=0;c<SIZE;c++) {
-          const cell = document.createElement('button'); cell.className='cell'; cell.setAttribute('aria-label', `${r+1}행 ${c+1}열`);
+          const cell = document.createElement('button');
+          cell.className='cell';
+          cell.setAttribute('aria-label', `${r+1}행 ${c+1}열`);
           if (starPoints.has(`${r},${c}`)) { const star=document.createElement('i'); star.className='star'; cell.appendChild(star); }
-          cell.addEventListener('click', () => playerMove(r,c)); boardEl.appendChild(cell); cells[r][c]=cell;
+          cell.addEventListener('click', () => playerMove(r,c));
+          boardGrid.appendChild(cell);
+          cells[r][c]=cell;
         }
       }
-      setStatus('내 차례입니다. 흑돌을 놓아주세요.'); render();
+      setStatus('내 차례입니다. 흑돌을 놓아주세요.');
+      render();
     }
+
     function setStatus(text) { statusEl.textContent = text; }
+
     function render() {
-      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) {
-        const cell=cells[r][c]; cell.classList.toggle('last', lastMove && lastMove[0]===r && lastMove[1]===c);
-        const old=cell.querySelector('.stone'); if (old) old.remove();
-        if (board[r][c]) { const stone=document.createElement('span'); stone.className=`stone ${board[r][c]===1?'black':'white'}`; cell.appendChild(stone); }
-        cell.disabled=gameOver || thinking || board[r][c]!==0;
+      for (let r=0;r<SIZE;r++) {
+        for (let c=0;c<SIZE;c++) {
+          const cell=cells[r][c];
+          cell.classList.toggle('last', lastMove && lastMove[0]===r && lastMove[1]===c);
+          const old=cell.querySelector('.stone');
+          if (old) old.remove();
+          if (board[r][c]) {
+            const stone=document.createElement('span');
+            stone.className=`stone ${board[r][c]===1?'black':'white'}`;
+            cell.appendChild(stone);
+          }
+          cell.disabled = gameOver || thinking || board[r][c] !== 0;
+        }
       }
     }
+
     function playerMove(r,c) {
       if (gameOver || thinking || board[r][c]) return;
       place(r,c,1);
       if (checkWin(r,c,1)) return finish('승리! 축하합니다 🎉');
       if (isFull()) return finish('무승부입니다!');
       thinking=true; setStatus('컴퓨터가 생각 중입니다…'); render();
-      setTimeout(() => { const move=chooseComputerMove(); thinking=false; if (!move) return finish('무승부입니다!'); place(move[0],move[1],2); if (checkWin(move[0],move[1],2)) finish('컴퓨터가 이겼습니다. 다음에는 이겨보세요!'); else if (isFull()) finish('무승부입니다!'); else { setStatus('내 차례입니다. 흑돌을 놓아주세요.'); render(); } }, 350);
+      setTimeout(() => {
+        const move=chooseComputerMove();
+        thinking=false;
+        if (!move) return finish('무승부입니다!');
+        place(move[0],move[1],2);
+        if (checkWin(move[0],move[1],2)) finish('컴퓨터가 이겼습니다. 다음에는 이겨보세요!');
+        else if (isFull()) finish('무승부입니다!');
+        else {
+          setStatus('내 차례입니다. 흑돌을 놓아주세요.');
+          render();
+        }
+      }, 350);
     }
+
     function place(r,c,who) { board[r][c]=who; lastMove=[r,c]; render(); }
     function finish(text) { gameOver=true; setStatus(text); render(); }
     function isFull() { return board.every(row => row.every(Boolean)); }
-    function checkWin(r,c,who) { return directions.some(([dr,dc]) => 1+count(r,c,dr,dc,who)+count(r,c,-dr,-dc,who)>=5); }
-    function count(r,c,dr,dc,who) { let n=0; for(let i=1;;i++){const y=r+dr*i,x=c+dc*i;if(y<0||y>=SIZE||x<0||x>=SIZE||board[y][x]!==who) return n;n++;} }
-    function candidates() { const out=[]; for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++)if(!board[r][c]) { let near=false; for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){if(board[r+dr]?.[c+dc]) near=true;} if(near||board.every(row=>row.every(v=>!v))) out.push([r,c]); } return out; }
-    function lineScore(r,c,who) { let score=0; for(const [dr,dc] of directions){let length=1, open=0; for(const sign of [-1,1]){for(let i=1;i<6;i++){const y=r+dr*i*sign,x=c+dc*i*sign;if(y<0||y>=SIZE||x<0||x>=SIZE)break;if(board[y][x]===who)length++;else {if(!board[y][x])open++;break;}}} if(length>=5)score+=100000; else if(length===4)score+=open===2?10000:1000; else if(length===3)score+=open===2?500:80; else if(length===2)score+=open===2?30:8;} return score; }
-    function chooseComputerMove() {
-      const spots=candidates(); if(!spots.length)return null;
-      if(level==='easy') return spots[Math.floor(Math.random()*spots.length)];
-      let best=-Infinity, chosen=spots[0];
-      for(const [r,c] of spots){ let value=lineScore(r,c,2)*1.15+lineScore(r,c,1); if(level==='hard') value=lineScore(r,c,2)*1.35+lineScore(r,c,1)*1.15; value += (7-Math.abs(7-r))+(7-Math.abs(7-c)); if(value>best){best=value;chosen=[r,c];} }
-      return chosen;
-    }
-    document.querySelectorAll('.difficulty button').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('.difficulty button').forEach(b=>b.classList.remove('selected')); button.classList.add('selected'); level=button.dataset.level; startGame(); }));
+    function checkWin(r,c,who) { return directions.some(([dr,dc]) => 1 + count(r,c,dr,dc,who) + count(r,c,-dr,-dc,who) >= 5); }
+    function count(r,c,dr,dc,who) { let n=0; for (let i=1;;i++) { const y=r+dr*i; const x=c+dc*i; if (y<0 || y>=SIZE || x<0 || x>=SIZE || board[y][x]!==who) return n; n++; } }
+    function candidates() { const out=[]; for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) { if (board[r][c]) continue; let near=false; for (let dr=-2;dr<=2;dr++) for (let dc=-2;dc<=2;dc++) { const y=r+dr, x=c+dc; if (y>=0 && y<SIZE && x>=0 && x<SIZE && board[y][x]) near=true; } if (near || board.every(row => row.every(v => !v))) out.push([r,c]); } return out; }
+    function lineScore(r,c,who) { let score=0; for (const [dr,dc] of directions) { let length=1, open=0; for (const sign of [-1,1]) { for (let i=1;i<6;i++) { const y=r+dr*i*sign; const x=c+dc*i*sign; if (y<0 || y>=SIZE || x<0 || x>=SIZE) break; if (board[y][x]===who) length++; else { if (!board[y][x]) open++; break; } } } if (length>=5) score += 100000; else if (length===4) score += open===2 ? 10000 : 1000; else if (length===3) score += open===2 ? 500 : 80; else if (length===2) score += open===2 ? 30 : 8; } return score; }
+    function chooseComputerMove() { const spots=candidates(); if(!spots.length) return null; if(level==='easy') return spots[Math.floor(Math.random()*spots.length)]; let best=-Infinity, chosen=spots[0]; for(const [r,c] of spots) { let value = lineScore(r,c,2) * 1.15 + lineScore(r,c,1); if(level==='hard') value = lineScore(r,c,2) * 1.35 + lineScore(r,c,1) * 1.15; value += (7-Math.abs(7-r)) + (7-Math.abs(7-c)); if(value>best){ best=value; chosen=[r,c]; } } return chosen; }
+    document.querySelectorAll('.difficulty button').forEach(button => { button.addEventListener('click', () => { document.querySelectorAll('.difficulty button').forEach(b => b.classList.remove('selected')); button.classList.add('selected'); level = button.dataset.level; startGame(); }); });
     document.getElementById('restart').addEventListener('click', startGame);
-    document.getElementById('change').addEventListener('click', () => { document.querySelector('.difficulty').scrollIntoView({behavior:'smooth',block:'center'}); document.querySelector('.difficulty button').focus(); });
+    document.getElementById('change').addEventListener('click', () => { document.querySelector('.difficulty').scrollIntoView({ behavior: 'smooth', block: 'center' }); document.querySelector('.difficulty button').focus(); });
     startGame();
   </script>
 </body>
