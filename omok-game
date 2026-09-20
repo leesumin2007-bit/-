@@ -1,1 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>15x15 오목 게임</title>
+  <style>
+    :root { --ink:#172033; --muted:#60708a; --accent:#2563eb; --wood:#d9a15b; --wood-dark:#a96f2e; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--ink); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:linear-gradient(135deg,#eaf3ff,#fff7e8); }
+    .app { width:min(1100px,94vw); margin:0 auto; padding:28px 0 44px; }
+    header { text-align:center; margin-bottom:20px; }
+    h1 { margin:0 0 8px; font-size:clamp(2rem,5vw,3.4rem); letter-spacing:-.07em; }
+    header p { margin:0; color:var(--muted); }
+    .layout { display:grid; grid-template-columns:minmax(280px,1fr) 310px; gap:22px; align-items:start; }
+    .panel, .board-card { background:rgba(255,255,255,.88); border:1px solid rgba(255,255,255,.8); border-radius:22px; box-shadow:0 16px 40px rgba(50,72,110,.14); }
+    .board-card { padding:clamp(10px,2vw,22px); }
+    .board-wrap { width:min(78vw,680px); max-width:100%; margin:auto; aspect-ratio:1; display:grid; place-items:center; border-radius:12px; padding:clamp(9px,2vw,18px); background:linear-gradient(135deg,#e4ad66,#c9893d); box-shadow:inset 0 0 0 2px rgba(115,65,18,.25),inset 0 5px 12px rgba(255,255,255,.25),0 8px 20px rgba(86,52,19,.2); }
+    .board { width:100%; height:100%; position:relative; display:grid; grid-template-columns:repeat(15,1fr); grid-template-rows:repeat(15,1fr); background:#e2aa62; background-image:linear-gradient(10deg,rgba(120,74,26,.05) 1px,transparent 1px); border:1px solid #85521f; }
+    .cell { position:relative; border:0; padding:0; background:transparent; cursor:pointer; }
+    .cell::before { content:""; position:absolute; left:0; right:0; top:50%; height:1px; background:#75481f; transform:translateY(-50%); }
+    .cell::after { content:""; position:absolute; top:0; bottom:0; left:50%; width:1px; background:#75481f; transform:translateX(-50%); }
+    .cell:hover:not(:disabled) { background:rgba(255,255,255,.16); }
+    .cell:disabled { cursor:default; }
+    .stone { position:absolute; z-index:2; width:76%; height:76%; left:12%; top:12%; border-radius:50%; box-shadow:inset -3px -4px 6px rgba(0,0,0,.28), inset 3px 3px 6px rgba(255,255,255,.3), 2px 3px 4px rgba(55,31,11,.35); pointer-events:none; }
+    .black { background:radial-gradient(circle at 34% 27%,#777,#111 45%,#000); }
+    .white { background:radial-gradient(circle at 33% 25%,#fff,#e7e7e7 55%,#a9a9a9); border:1px solid #929292; }
+    .last .stone { outline:3px solid #f43f5e; outline-offset:2px; }
+    .star { position:absolute; z-index:1; width:15%; height:15%; left:42.5%; top:42.5%; border-radius:50%; background:#75481f; }
+    .side { padding:24px; }
+    .side h2 { font-size:1.1rem; margin:0 0 14px; }
+    .difficulty { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:18px; }
+    button.action, .difficulty button { border:0; border-radius:12px; padding:12px 8px; font:inherit; font-weight:700; cursor:pointer; transition:.2s; }
+    .difficulty button { color:#52627a; background:#eef3f9; }
+    .difficulty button.selected { color:#fff; background:var(--accent); box-shadow:0 5px 12px rgba(37,99,235,.3); }
+    button.action { width:100%; margin-top:9px; color:#fff; background:#172033; }
+    button.action.secondary { color:#172033; background:#e9eef5; }
+    button.action:hover, .difficulty button:hover { transform:translateY(-1px); filter:brightness(1.03); }
+    .status { min-height:48px; display:grid; place-items:center; padding:10px; text-align:center; border-radius:12px; background:#f4f7fb; color:#394965; font-weight:700; margin:14px 0; }
+    .rules { margin-top:22px; padding-top:18px; border-top:1px solid #e4eaf2; color:#52627a; font-size:.92rem; line-height:1.65; }
+    .rules h3 { margin:0 0 6px; color:var(--ink); font-size:1rem; }
+    .rules ol { padding-left:20px; margin:6px 0 0; }
+    .legend { display:flex; justify-content:center; gap:18px; margin-top:12px; color:var(--muted); font-size:.85rem; }
+    .legend span::before { content:""; display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+    .legend .b::before { background:#111; }.legend .w::before { background:#fff; border:1px solid #aaa; }
+    @media (max-width:800px) { .layout { grid-template-columns:1fr; } .side { padding:19px; } .board-wrap { width:min(94vw,680px); } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header><h1>15×15 오목</h1><p>컴퓨터와 두뇌 대결을 펼쳐 보세요!</p></header>
+    <section class="layout">
+      <div class="board-card">
+        <div id="board" class="board-wrap" aria-label="15 곱하기 15 오목판"></div>
+        <div class="legend"><span class="b">흑돌: 나</span><span class="w">백돌: 컴퓨터</span></div>
+      </div>
+      <aside class="panel side">
+        <h2>난이도를 선택하세요</h2>
+        <div class="difficulty" role="group" aria-label="난이도">
+          <button data-level="easy">하수</button><button data-level="normal" class="selected">중수</button><button data-level="hard">고수</button>
+        </div>
+        <div id="status" class="status">내 차례입니다. 흑돌을 놓아주세요.</div>
+        <button id="restart" class="action">다시하기</button>
+        <button id="change" class="action secondary">난이도 다시 선택하기</button>
+        <div class="rules">
+          <h3>오목 규칙</h3>
+          <ol><li>흑돌과 백돌이 번갈아 한 칸씩 놓습니다.</li><li>가로, 세로, 대각선 중 한 방향으로 같은 색 돌 5개를 먼저 이어 놓으면 승리합니다.</li><li>돌을 놓은 뒤에는 옮기거나 지울 수 없습니다.</li><li>판이 모두 차면 더 이상 놓을 곳이 없는 것으로, 승부가 나지 않습니다.</li></ol>
+        </div>
+      </aside>
+    </section>
+  </main>
+  <script>
+    const SIZE = 15;
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    let board, cells, level = 'normal', gameOver = false, thinking = false, lastMove = null;
+    const starPoints = new Set(['3,3','3,11','7,7','11,3','11,11']);
+    const directions = [[1,0],[0,1],[1,1],[1,-1]];
 
+    function startGame() {
+      board = Array.from({length:SIZE}, () => Array(SIZE).fill(0));
+      gameOver = false; thinking = false; lastMove = null;
+      boardEl.innerHTML = '';
+      cells = [];
+      for (let r=0;r<SIZE;r++) {
+        cells[r] = [];
+        for (let c=0;c<SIZE;c++) {
+          const cell = document.createElement('button'); cell.className='cell'; cell.setAttribute('aria-label', `${r+1}행 ${c+1}열`);
+          if (starPoints.has(`${r},${c}`)) { const star=document.createElement('i'); star.className='star'; cell.appendChild(star); }
+          cell.addEventListener('click', () => playerMove(r,c)); boardEl.appendChild(cell); cells[r][c]=cell;
+        }
+      }
+      setStatus('내 차례입니다. 흑돌을 놓아주세요.'); render();
+    }
+    function setStatus(text) { statusEl.textContent = text; }
+    function render() {
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) {
+        const cell=cells[r][c]; cell.classList.toggle('last', lastMove && lastMove[0]===r && lastMove[1]===c);
+        const old=cell.querySelector('.stone'); if (old) old.remove();
+        if (board[r][c]) { const stone=document.createElement('span'); stone.className=`stone ${board[r][c]===1?'black':'white'}`; cell.appendChild(stone); }
+        cell.disabled=gameOver || thinking || board[r][c]!==0;
+      }
+    }
+    function playerMove(r,c) {
+      if (gameOver || thinking || board[r][c]) return;
+      place(r,c,1);
+      if (checkWin(r,c,1)) return finish('승리! 축하합니다 🎉');
+      if (isFull()) return finish('무승부입니다!');
+      thinking=true; setStatus('컴퓨터가 생각 중입니다…'); render();
+      setTimeout(() => { const move=chooseComputerMove(); thinking=false; if (!move) return finish('무승부입니다!'); place(move[0],move[1],2); if (checkWin(move[0],move[1],2)) finish('컴퓨터가 이겼습니다. 다음에는 이겨보세요!'); else if (isFull()) finish('무승부입니다!'); else { setStatus('내 차례입니다. 흑돌을 놓아주세요.'); render(); } }, 350);
+    }
+    function place(r,c,who) { board[r][c]=who; lastMove=[r,c]; render(); }
+    function finish(text) { gameOver=true; setStatus(text); render(); }
+    function isFull() { return board.every(row => row.every(Boolean)); }
+    function checkWin(r,c,who) { return directions.some(([dr,dc]) => 1+count(r,c,dr,dc,who)+count(r,c,-dr,-dc,who)>=5); }
+    function count(r,c,dr,dc,who) { let n=0; for(let i=1;;i++){const y=r+dr*i,x=c+dc*i;if(y<0||y>=SIZE||x<0||x>=SIZE||board[y][x]!==who) return n;n++;} }
+    function candidates() { const out=[]; for(let r=0;r<SIZE;r++)for(let c=0;c<SIZE;c++)if(!board[r][c]) { let near=false; for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){if(board[r+dr]?.[c+dc]) near=true;} if(near||board.every(row=>row.every(v=>!v))) out.push([r,c]); } return out; }
+    function lineScore(r,c,who) { let score=0; for(const [dr,dc] of directions){let length=1, open=0; for(const sign of [-1,1]){for(let i=1;i<6;i++){const y=r+dr*i*sign,x=c+dc*i*sign;if(y<0||y>=SIZE||x<0||x>=SIZE)break;if(board[y][x]===who)length++;else {if(!board[y][x])open++;break;}}} if(length>=5)score+=100000; else if(length===4)score+=open===2?10000:1000; else if(length===3)score+=open===2?500:80; else if(length===2)score+=open===2?30:8;} return score; }
+    function chooseComputerMove() {
+      const spots=candidates(); if(!spots.length)return null;
+      if(level==='easy') return spots[Math.floor(Math.random()*spots.length)];
+      let best=-Infinity, chosen=spots[0];
+      for(const [r,c] of spots){ let value=lineScore(r,c,2)*1.15+lineScore(r,c,1); if(level==='hard') value=lineScore(r,c,2)*1.35+lineScore(r,c,1)*1.15; value += (7-Math.abs(7-r))+(7-Math.abs(7-c)); if(value>best){best=value;chosen=[r,c];} }
+      return chosen;
+    }
+    document.querySelectorAll('.difficulty button').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('.difficulty button').forEach(b=>b.classList.remove('selected')); button.classList.add('selected'); level=button.dataset.level; startGame(); }));
+    document.getElementById('restart').addEventListener('click', startGame);
+    document.getElementById('change').addEventListener('click', () => { document.querySelector('.difficulty').scrollIntoView({behavior:'smooth',block:'center'}); document.querySelector('.difficulty button').focus(); });
+    startGame();
+  </script>
+</body>
+</html>
